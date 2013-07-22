@@ -1,15 +1,30 @@
 (ns affinis.io
-  (:import java.util.concurrent.LinkedBlockingQueue))
-
-;; Input queue. Holds messages we've received from the socket. This is
-;; populated in another thread by `read-lines`. Later this is read from by the
-;; `take-line` state, a state held by the agent active on the thread.
-(defonce input (LinkedBlockingQueue.))
-
-;; Output queue. Holds messages we're sending to the socket. This is populated
-;; by invoking `put-line`. In another thread, `write-lines` takes off this
-;; queue and sends those lines to the socket.
-(defonce output (LinkedBlockingQueue.))
+  (:require [clojure.core.async :refer [>! <! go]]
+            [clojure.java.io :as io]
+            [clojure.tools.logging :as logging]))
 
 
-(defn put-line [line] (.put output line))
+(defn put-line [{:keys [irc-state]} line] (go (>! (:output @irc-state) line)))
+
+
+(defn read-lines
+  "
+  Loops over a socket connection, reading lines and putting them into a queue.
+  "
+  [{:keys [socket irc-state]}]
+  (go (let [{input :input} @irc-state]
+        (doseq [line (line-seq (io/reader socket))]
+          (>! input line)
+          (logging/info line)))))
+
+
+(defn write-lines
+  "
+  Takes a lines off the `output` queue and writes it to a socket connection.
+  "
+  [{:keys [socket irc-state]}]
+  (go (while true
+        (when-let [line (<! (:output @irc-state))]
+          (binding [*out* (io/writer socket)]
+            (println line))
+          (logging/info (str ">>> " line))))))
