@@ -5,9 +5,9 @@ An IRC connection layer written in Clojure.
 ## Usage
 
 ```clojure
-(require '[affinis.connection :refer [connect run]])
+(require '[affinis.connection :refer [run with-connection]])
 
-(run (connect "irc.example.com" 6667 "nick" "user" "realname"))
+(run (with-connection ["irc.example.com" 6667 "nick" "user" "realname"]))
 ```
 
 ## License
